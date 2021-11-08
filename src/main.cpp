@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
+#include <sstream>
 
 #define ASSERT(x) if(!x) exit(-1);
 
@@ -11,7 +12,7 @@ struct shaderResource {
     std::string fragmentSrc;
 }
 
-static shaderResource readShaders(){
+static shaderResource readShaders(std::string filepath) {
     enum class shaderTypes {
         NONE = -1,
         VERTEX = 0,
@@ -19,16 +20,21 @@ static shaderResource readShaders(){
         };
 
     
-    
+    std::stringstream ss[2];
+    shaderTypes currentShader = NONE;
     std::string line;
-    std::ifstream shader ("res/basic.shader");
+    std::ifstream shader (filepath);
     while(std::getLine(shader, line)){
-        if(std::string.find("#shader")){
-            if(std::string.find("vertex")){}
-            else if(std::string.find("fragment")){}
-        }        
+        if(std::string.find("#shader") != std::string::npos){
+            if(std::string.find("vertex") != std::string::npos)
+                currentShader = VERTEX;
+            else if(std::string.find("fragment") != std::string::npos)
+                currentShader = FRAGMENT;;
+        }
+        else ss[(int) currentShader] << line << "\n";
     }
     shader.close();
+    return { ss[0].str(), ss[1].str()};
 }
 
 static unsigned int CompileShader(unsigned int type, const std::string& source){
@@ -114,7 +120,10 @@ int main(void)
      
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0); // unbind buffer 
-    unsigned int shader = createShader(vertexShader, fragmentShader);
+    
+    shaderResource shaderSource = readShaders("res/basic.shader"); // read from "res/basic.shader" for shaders 
+    
+    unsigned int shader = createShader(shaderSource.vertexSrc, shaderSource.fragmentSrc); //make shader and set "shader" variable to id
     glUseProgram(shader);
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
