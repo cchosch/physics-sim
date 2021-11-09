@@ -188,16 +188,27 @@ int main(void)
     shaderResource shaderSource = readShaders("res/basic.shader"); // read from "res/basic.shader" for shaders 
     
     glSafeCall(unsigned int shader = createShader(shaderSource.vertexSrc, shaderSource.fragmentSrc)); //make shader and set "shader" variable to id
-    glSafeCall(glUseProgram(shader));
+    glSafeCall(glUseProgram(shader)); // bind shader so that we use it when rendering 
+
+    glSafeCall(int uniformId = glGetUniformLocation(shader, "u_Color"));
+    glSafeCall(glUniform4f(uniformId, 0.3, 1.0, 0.6, 1.0));
+    float increment = -0.05f;
+    float b = 1.0;
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
 
+        glSafeCall(glUniform4f(uniformId, 0.3f, 0.6f, b, 1.0f));
+        glSafeCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr)); // ibo is already bound so we can use nullptr
 
-        glSafeCall(glDrawElements(GL_TRIANGLES, 6, GL_INT, nullptr)); // ibo is already bound so we can use nullptr
+        if (b >= 1)
+            increment = -0.05f;
+        else if (b <= 0)
+            increment = 0.05f;
 
+        b += increment;
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
 
