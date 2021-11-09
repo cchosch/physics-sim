@@ -5,36 +5,88 @@
 #include <stdlib.h>
 #include <sstream>
 
-#define ASSERT(x) if(!x) exit(-1);
+#define ASSERT(x) if(!(x)) __debugbreak();
+#define glSafeCall(x) clearErrors(); x; ASSERT(logErrors(#x, __FILE__, __LINE__))
+
+char const* gl_error_string(GLenum const err) noexcept
+{
+    switch (err)
+    {
+        // opengl 2 errors (8)
+    case GL_NO_ERROR:
+        return "GL_NO_ERROR";
+
+    case GL_INVALID_ENUM:
+        return "GL_INVALID_ENUM";
+
+    case GL_INVALID_VALUE:
+        return "GL_INVALID_VALUE";
+
+    case GL_INVALID_OPERATION:
+        return "GL_INVALID_OPERATION";
+
+    case GL_STACK_OVERFLOW:
+        return "GL_STACK_OVERFLOW";
+
+    case GL_STACK_UNDERFLOW:
+        return "GL_STACK_UNDERFLOW";
+
+    case GL_OUT_OF_MEMORY:
+        return "GL_OUT_OF_MEMORY";
+
+    case GL_TABLE_TOO_LARGE:
+        return "GL_TABLE_TOO_LARGE";
+
+        // opengl 3 errors (1)
+    case GL_INVALID_FRAMEBUFFER_OPERATION:
+        return "GL_INVALID_FRAMEBUFFER_OPERATION";
+
+        // gles 2, 3 and gl 4 error are handled by the switch above
+    default:
+        return nullptr;
+    }
+}
 
 struct shaderResource {
     std::string vertexSrc;
     std::string fragmentSrc;
-}
+};
 
 static shaderResource readShaders(std::string filepath) {
     enum class shaderTypes {
         NONE = -1,
         VERTEX = 0,
-        FRAGMENT = 0
+        FRAGMENT = 1
         };
 
     
     std::stringstream ss[2];
-    shaderTypes currentShader = NONE;
+    shaderTypes currentShader = shaderTypes::NONE;
     std::string line;
     std::ifstream shader (filepath);
-    while(std::getLine(shader, line)){
-        if(std::string.find("#shader") != std::string::npos){
-            if(std::string.find("vertex") != std::string::npos)
-                currentShader = VERTEX;
-            else if(std::string.find("fragment") != std::string::npos)
-                currentShader = FRAGMENT;;
+    while(std::getline(shader, line)){
+        if(line.find("#shader") != std::string::npos){
+            if(line.find("vertex") != std::string::npos)
+                currentShader = shaderTypes::VERTEX;
+            else if(line.find("fragment") != std::string::npos)
+                currentShader = shaderTypes::FRAGMENT;
         }
         else ss[(int) currentShader] << line << "\n";
     }
     shader.close();
     return { ss[0].str(), ss[1].str()};
+}
+
+static void clearErrors() {
+    while (glGetError());
+}
+
+static bool logErrors(std::string function, std::string file, int line) {
+    while (unsigned int error = glGetError()) {
+        std::cout << "OPENGL ERROR " << gl_error_string(error) << " in function " << function << " " << file << ":" << line << std::endl;
+        return false;
+    }
+    return true;
 }
 
 static unsigned int CompileShader(unsigned int type, const std::string& source){
@@ -104,34 +156,47 @@ int main(void)
         return -1;
     }
     
-    std::cout << glGetString(GL_VERSION);
+    std::cout << glGetString(GL_VERSION) << std::endl;
      
-    float verticies[6] = {
+    float verticies[8] = {
          0.0f, 1.0f,
         -1.0f, 0.0f,
-         0.1f, 0.0f
+         0.0f, 0.0f, 
+         -1.0f, 1.0f 
+
     };
     
+    unsigned int indicies[] = {
+        1, 2, 0,
+        1, 0, 3
+    };
+
     unsigned int buffer; // positive only int
-    glGenBuffers(1, &buffer); // generate buffer and then get id for buffer
-    glBindBuffer(GL_ARRAY_BUFFER, buffer); // select buffer for drawing
-    glBufferData(GL_ARRAY_BUFFER, sizeof(verticies), verticies, GL_STATIC_DRAW); // fill bound buffer with data 
-    glEnableVertexAttribArray(0); //enable vertex attribute
+    glSafeCall(glGenBuffers(1, &buffer)); // generate buffer and then get id for buffer
+    glSafeCall(glBindBuffer(GL_ARRAY_BUFFER, buffer)); // select buffer for drawing
+    glSafeCall(glBufferData(GL_ARRAY_BUFFER, sizeof(verticies), verticies, GL_STATIC_DRAW)); // fill bound buffer with data 
+    glSafeCall(glEnableVertexAttribArray(0)); //enable vertex attribute
      
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0); // unbind buffer 
+    glSafeCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0));
     
+    // CREATE IBO BUFFER AND SEND IT INDICIE DATA
+    unsigned int ibo; // positive only int
+    glSafeCall(glGenBuffers(1, &ibo)); // generate buffer and then get id for buffer
+    glSafeCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo)); // select buffer for drawing
+    glSafeCall(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indicies), indicies, GL_STATIC_DRAW)); // fill bound buffer with data 
+
     shaderResource shaderSource = readShaders("res/basic.shader"); // read from "res/basic.shader" for shaders 
     
-    unsigned int shader = createShader(shaderSource.vertexSrc, shaderSource.fragmentSrc); //make shader and set "shader" variable to id
-    glUseProgram(shader);
+    glSafeCall(unsigned int shader = createShader(shaderSource.vertexSrc, shaderSource.fragmentSrc)); //make shader and set "shader" variable to id
+    glSafeCall(glUseProgram(shader));
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        glSafeCall(glDrawElements(GL_TRIANGLES, 6, GL_INT, nullptr)); // ibo is already bound so we can use nullptr
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
