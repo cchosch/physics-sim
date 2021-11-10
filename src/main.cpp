@@ -4,6 +4,7 @@
 #include <fstream>
 #include <stdlib.h>
 #include <sstream>
+#include <chrono>
 
 #define ASSERT(x) if(!(x)) __debugbreak();
 #define glSafeCall(x) clearErrors(); x; ASSERT(logErrors(#x, __FILE__, __LINE__))
@@ -142,8 +143,7 @@ int main(void)
     
     /* Create a windowed mode window and its OpenGL context */
     window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
-    if (!window)
-    {
+    if (!window){
         glfwTerminate();
         return -1;
     }
@@ -175,8 +175,8 @@ int main(void)
     glSafeCall(glGenBuffers(1, &buffer)); // generate buffer and then get id for buffer
     glSafeCall(glBindBuffer(GL_ARRAY_BUFFER, buffer)); // select buffer for drawing
     glSafeCall(glBufferData(GL_ARRAY_BUFFER, sizeof(verticies), verticies, GL_STATIC_DRAW)); // fill bound buffer with data 
+
     glSafeCall(glEnableVertexAttribArray(0)); //enable vertex attribute
-     
     glSafeCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0));
     
     // CREATE IBO BUFFER AND SEND IT INDICIE DATA
@@ -194,9 +194,11 @@ int main(void)
     glSafeCall(glUniform4f(uniformId, 0.3, 1.0, 0.6, 1.0));
     float increment = -0.05f;
     float b = 1.0;
+    std::chrono::steady_clock::time_point timeStart = std::chrono::steady_clock::now();
+    int fps = 0;
     /* Loop until the user closes the window */
-    while (!glfwWindowShouldClose(window))
-    {
+    while (!glfwWindowShouldClose(window)){
+        fps++;
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -214,6 +216,11 @@ int main(void)
 
         /* Poll for and process events */
         glfwPollEvents();
+        if(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-timeStart).count() > 1000){
+            glfwSetWindowTitle(window, std::to_string(fps).c_str());
+            timeStart = std::chrono::steady_clock::now();
+            fps = 0;
+        }
     }
 
     glDeleteShader(shader);
