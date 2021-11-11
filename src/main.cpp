@@ -5,48 +5,9 @@
 #include <stdlib.h>
 #include <sstream>
 #include <chrono>
-
-#define ASSERT(x) if(!(x)) __debugbreak();
-#define glSafeCall(x) clearErrors(); x; ASSERT(logErrors(#x, __FILE__, __LINE__))
-
-char const* gl_error_string(GLenum const err) noexcept
-{
-    switch (err)
-    {
-        // opengl 2 errors (8)
-    case GL_NO_ERROR:
-        return "GL_NO_ERROR";
-
-    case GL_INVALID_ENUM:
-        return "GL_INVALID_ENUM";
-
-    case GL_INVALID_VALUE:
-        return "GL_INVALID_VALUE";
-
-    case GL_INVALID_OPERATION:
-        return "GL_INVALID_OPERATION";
-
-    case GL_STACK_OVERFLOW:
-        return "GL_STACK_OVERFLOW";
-
-    case GL_STACK_UNDERFLOW:
-        return "GL_STACK_UNDERFLOW";
-
-    case GL_OUT_OF_MEMORY:
-        return "GL_OUT_OF_MEMORY";
-
-    case GL_TABLE_TOO_LARGE:
-        return "GL_TABLE_TOO_LARGE";
-
-        // opengl 3 errors (1)
-    case GL_INVALID_FRAMEBUFFER_OPERATION:
-        return "GL_INVALID_FRAMEBUFFER_OPERATION";
-
-        // gles 2, 3 and gl 4 error are handled by the switch above
-    default:
-        return nullptr;
-    }
-}
+#include "Renderer.h"
+#include "VertexBuffer.h"
+#include "IndexBuffer.h"
 
 struct shaderResource {
     std::string vertexSrc;
@@ -78,17 +39,7 @@ static shaderResource readShaders(std::string filepath) {
     return { ss[0].str(), ss[1].str()};
 }
 
-static void clearErrors() {
-    while (glGetError());
-}
 
-static bool logErrors(std::string function, std::string file, int line) {
-    while (unsigned int error = glGetError()) {
-        std::cout << "OPENGL ERROR " << gl_error_string(error) << " in function " << function << " " << file << ":" << line << std::endl;
-        return false;
-    }
-    return true;
-}
 
 static unsigned int CompileShader(unsigned int type, const std::string& source){
     unsigned int id = glCreateShader(type); // create shader and return id 
@@ -103,7 +54,7 @@ static unsigned int CompileShader(unsigned int type, const std::string& source){
         //shader did not compile properly
         int length;
         glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
-        char* message = (char*)alloca(length * sizeof(char));
+        char* message = (char*) alloca(length * sizeof(char));
         glGetShaderInfoLog(id, length, &length, message);
         std::cout << "Failed to compile " << (type == GL_VERTEX_SHADER ? "vertex" : "fragment") << "shader." << std::endl;
         std::cout << message << std::endl;
@@ -139,7 +90,10 @@ int main(void)
     /* Initialize the library */
     if (!glfwInit())
         return -1;
-    
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     
     /* Create a windowed mode window and its OpenGL context */
     window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
@@ -155,76 +109,73 @@ int main(void)
         std::cout << glewGetErrorString(glew_init);
         return -1;
     }
-    
-    std::cout << glGetString(GL_VERSION) << std::endl;
      
-    float verticies[8] = {
-         0.0f, 1.0f,
-        -1.0f, 0.0f,
-         0.0f, 0.0f, 
-         -1.0f, 1.0f 
-
-    };
+    std::cout << glGetString(GL_VERSION) << std::endl;
+    {
+        float verticies[8] = {
+             0.0f, 1.0f,
+            -1.0f, 0.0f,
+             0.0f, 0.0f, 
+            -1.0f, 1.0f 
+        };
     
-    unsigned int indicies[] = {
-        1, 2, 0,
-        1, 0, 3
-    };
-
-    unsigned int buffer; // positive only int
-    glSafeCall(glGenBuffers(1, &buffer)); // generate buffer and then get id for buffer
-    glSafeCall(glBindBuffer(GL_ARRAY_BUFFER, buffer)); // select buffer for drawing
-    glSafeCall(glBufferData(GL_ARRAY_BUFFER, sizeof(verticies), verticies, GL_STATIC_DRAW)); // fill bound buffer with data 
-
-    glSafeCall(glEnableVertexAttribArray(0)); //enable vertex attribute
-    glSafeCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0));
+        unsigned int indicies[] = {
+            1, 2, 0,
+            1, 0, 3
+        };
+        unsigned int vao; // vertex array object
+        glSafeCall(glGenVertexArrays(1, &vao)); // get id for vertex array
+        glSafeCall(glBindVertexArray(vao)); // bind vertex array 
     
-    // CREATE IBO BUFFER AND SEND IT INDICIE DATA
-    unsigned int ibo; // positive only int
-    glSafeCall(glGenBuffers(1, &ibo)); // generate buffer and then get id for buffer
-    glSafeCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo)); // select buffer for drawing
-    glSafeCall(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indicies), indicies, GL_STATIC_DRAW)); // fill bound buffer with data 
+        VertexBuffer vb(verticies, sizeof(verticies));
 
-    shaderResource shaderSource = readShaders("res/basic.shader"); // read from "res/basic.shader" for shaders 
+        glSafeCall(glEnableVertexAttribArray(0)); //enable vertex attribute
+        glSafeCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0));
     
-    glSafeCall(unsigned int shader = createShader(shaderSource.vertexSrc, shaderSource.fragmentSrc)); //make shader and set "shader" variable to id
-    glSafeCall(glUseProgram(shader)); // bind shader so that we use it when rendering 
+        IndexBuffer ib(indicies, 6);
 
-    glSafeCall(int uniformId = glGetUniformLocation(shader, "u_Color"));
-    glSafeCall(glUniform4f(uniformId, 0.3, 1.0, 0.6, 1.0));
-    float increment = -0.05f;
-    float b = 1.0;
-    std::chrono::steady_clock::time_point timeStart = std::chrono::steady_clock::now();
-    int fps = 0;
-    /* Loop until the user closes the window */
-    while (!glfwWindowShouldClose(window)){
-        fps++;
-        /* Render here */
-        glClear(GL_COLOR_BUFFER_BIT);
+        shaderResource shaderSource = readShaders("res/basic.shader"); // read from "res/basic.shader" for shaders 
+    
+        glSafeCall(unsigned int shader = createShader(shaderSource.vertexSrc, shaderSource.fragmentSrc)); //make shader and set "shader" variable to id
+        glSafeCall(glUseProgram(shader)); // bind shader so that we use it when rendering 
 
-        glSafeCall(glUniform4f(uniformId, 0.3f, 0.6f, b, 1.0f));
-        glSafeCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr)); // ibo is already bound so we can use nullptr
+        glSafeCall(int uniformId = glGetUniformLocation(shader, "u_Color"));
+        glSafeCall(glUniform4f(uniformId, 0.3f, 1.0f, 0.6f, 1.0f));
+        float increment = -0.05f;
+        float b = 1.0;
+        std::chrono::steady_clock::time_point timeStart = std::chrono::steady_clock::now();
+        int fps = 0;
+        /* Loop until the user closes the window */
+        while (!glfwWindowShouldClose(window)){
+            fps++;
+            /* Render here */
+            glClear(GL_COLOR_BUFFER_BIT);
 
-        if (b >= 1)
-            increment = -0.05f;
-        else if (b <= 0)
-            increment = 0.05f;
+            if (b >= 1)
+                increment = -0.05f;
+            else if (b <= 0)
+                increment = 0.05f;
+    
+            b += increment;
+    
+            glSafeCall(glUniform4f(uniformId, 0.3f, 0.6f, b, 1.0f));
 
-        b += increment;
-        /* Swap front and back buffers */
-        glfwSwapBuffers(window);
 
-        /* Poll for and process events */
-        glfwPollEvents();
-        if(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-timeStart).count() > 1000){
-            glfwSetWindowTitle(window, std::to_string(fps).c_str());
-            timeStart = std::chrono::steady_clock::now();
-            fps = 0;
+            glSafeCall(glDrawElements(GL_TRIANGLES, ib.getCount(), GL_UNSIGNED_INT, nullptr)); // ibo is already bound so we can use nullptr
+    
+            /* Swap front and back buffers */
+            glfwSwapBuffers(window);
+
+            /* Poll for and process events */
+            glfwPollEvents();
+            if(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-timeStart).count() > 1000){
+               glfwSetWindowTitle(window, std::to_string(fps).c_str());
+                timeStart = std::chrono::steady_clock::now();
+                fps = 0;
+            }
         }
+        glDeleteShader(shader);
     }
-
-    glDeleteShader(shader);
-
     glfwTerminate();
     return 0;
 }

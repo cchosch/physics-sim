@@ -1,0 +1,3 @@
+﻿  main.cpp
+E:\Workspace\physics-sim\src\main.cpp(199,5): warning C4305: 'argument': truncation from 'double' to 'GLfloat'
+LINK : fatal error LNK1104: cannot open file 'glew32s.lib'

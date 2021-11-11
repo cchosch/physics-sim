@@ -1,8 +1,7 @@
 ﻿  main.cpp
-E:\Workspace\physics-sim\src\main.cpp(194,5): warning C4305: 'argument': truncation from 'double' to 'GLfloat'
 LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
   Generating code
-  0 of 226 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
+  1 of 239 functions ( 0.4%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
     0 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
